@@ -1,0 +1,1244 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台灣路線地圖</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        /* ===== CSS 樣式 ===== */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft JhengHei', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        header {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            backdrop-filter: blur(10px);
+        }
+
+        h1 {
+            color: #333;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+
+        button {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        button:hover {
+            background: linear-gradient(45deg, #45a049, #4CAF50);
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.4);
+        }
+
+        button:active {
+            transform: translateY(0);
+        }
+
+        .map-container {
+            position: relative;
+            background: white;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        #map {
+            height: 600px;
+            width: 100%;
+        }
+
+        .legend {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+            max-width: 300px;
+            max-height: 400px;
+            overflow-y: auto;
+            z-index: 1000;
+            backdrop-filter: blur(10px);
+        }
+
+        .legend h3 {
+            margin-bottom: 15px;
+            color: #333;
+            font-size: 1.2rem;
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            padding: 5px;
+            border-radius: 5px;
+            transition: background 0.2s ease;
+        }
+
+        .legend-item:hover {
+            background: rgba(76, 175, 80, 0.1);
+        }
+
+        .legend-color {
+            width: 20px;
+            height: 4px;
+            margin-right: 10px;
+            border-radius: 2px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+        }
+
+        .legend-text {
+            font-size: 12px;
+            color: #555;
+            line-height: 1.3;
+        }
+
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 2000;
+            color: white;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 6px solid #f3f3f3;
+            border-top: 6px solid #4CAF50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 20px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading p {
+            font-size: 1.2rem;
+            margin-top: 10px;
+        }
+
+        .error {
+            background: linear-gradient(45deg, #f44336, #d32f2f);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            text-align: center;
+            box-shadow: 0 4px 15px rgba(244, 67, 54, 0.3);
+        }
+
+        .error h3 {
+            margin-bottom: 10px;
+            font-size: 1.3rem;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .route-popup {
+            min-width: 200px;
+        }
+
+        .route-popup h4 {
+            color: #4CAF50;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
+        }
+
+        .route-popup p {
+            margin-bottom: 5px;
+            font-size: 0.9rem;
+        }
+
+        .custom-marker {
+            border: none !important;
+            background: transparent !important;
+        }
+
+        .status-bar {
+            background: rgba(255, 255, 255, 0.9);
+            padding: 10px 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4CAF50;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            header {
+                flex-direction: column;
+                gap: 15px;
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 1.5rem;
+            }
+            
+            #map {
+                height: 400px;
+            }
+            
+            .legend {
+                position: relative;
+                top: auto;
+                right: auto;
+                margin: 20px;
+                max-width: none;
+            }
+            
+            .controls {
+                flex-wrap: wrap;
+                justify-content: center;
+            }
+            
+            button {
+                padding: 10px 20px;
+                font-size: 13px;
+            }
+            
+            .status-bar {
+                flex-direction: column;
+                gap: 10px;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🗺️ 台灣路線追蹤地圖</h1>
+            <div class="controls">
+                <button id="refreshBtn">🔄 重新載入</button>
+                <button id="toggleLegend">📋 圖例</button>
+                <button id="clearCache">🗑️ 清除快取</button>
+            </div>
+        </header>
+        
+        <div class="map-container">
+            <div id="map"></div>
+            <div id="legend" class="legend hidden">
+                <h3>📍 路線圖例</h3>
+                <div id="legendContent"></div>
+            </div>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-indicator">
+                <div class="status-dot"></div>
+                <span id="statusText">系統就緒</span>
+            </div>
+            <div>
+                <span>最後更新: </span>
+                <span id="lastUpdate">尚未載入</span>
+            </div>
+            <div>
+                <span>路線數量: </span>
+                <span id="routeCount">0</span>
+            </div>
+        </div>
+        
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>🔄 載入路線資料中...</p>
+            <small>請稍候，正在從 Google Sheets 獲取最新資料</small>
+        </div>
+        
+        <div id="error" class="error hidden">
+            <h3>❌ 載入失敗</h3>
+            <p id="errorMessage">無法載入路線資料，請稍後再試</p>
+            <button onclick="window.taiwanMap.loadRoutes()" style="margin-top: 10px;">
+                🔄 重新嘗試
+            </button>
+        </div>
+    </div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <script>
+        /* ===== JavaScript 代碼 ===== */
+        
+        // 配置設定
+        const CONFIG = {
+            // Google Sheets 設定
+            SHEET_ID: '15Uz4_XE9jf2k2phkuIeodnatpPlK04FHOe0mTHwimT0',
+            SHEET_RANGE: '工作表1!A:E',
+            
+            // 後端 API 設定 (請替換為您的後端網址)
+            API_BASE_URL: 'https://script.google.com/macros/s/AKfycbzdJVd8JhRVJQwPmGAKUpxDz_p9UZNQmdfhmpdXA8la7C6xTh5rOFJsCRwbwhHdvJdF/exec',
+            
+            // 地圖設定
+            MAP_CENTER: [23.8, 121.0],
+            MAP_ZOOM: 7,
+            
+            // 路線顏色
+            ROUTE_COLORS: [
+                '#FF6B6B', '#4ECDC4', '#45B7D1', '#96CEB4', 
+                '#FFEAA7', '#DDA0DD', '#98D8C8', '#F7DC6F',
+                '#BB8FCE', '#85C1E9', '#F8C471', '#82E0AA',
+                '#F1948A', '#85C1E9', '#F8C471', '#82E0AA'
+            ],
+            
+            // 更新間隔 (毫秒)
+            REFRESH_INTERVAL: 300000 // 5分鐘
+        };
+
+        // 台灣主要地點座標
+        const TAIWAN_LOCATIONS = {
+            '台北': [25.0330, 121.5654],
+            '新北': [25.0173, 121.4467],
+            '桃園': [24.9936, 121.3010],
+            '新竹': [24.8138, 120.9675],
+            '苗栗': [24.5602, 120.8214],
+            '台中': [24.1477, 120.6736],
+            '彰化': [24.0518, 120.5161],
+            '南投': [23.9609, 120.9718],
+            '雲林': [23.7092, 120.4313],
+            '嘉義': [23.4801, 120.4491],
+            '台南': [22.9999, 120.2269],
+            '高雄': [22.6273, 120.3014],
+            '屏東': [22.5519, 120.5487],
+            '宜蘭': [24.7021, 121.7378],
+            '花蓮': [23.9871, 121.6015],
+            '台東': [22.7972, 121.1713],
+            '澎湖': [23.5711, 119.5793],
+            '金門': [24.4492, 118.3765],
+            '連江': [26.1605, 119.9297],
+            // 新增更多地點
+            '基隆': [25.1276, 121.7391],
+            '竹北': [24.8387, 121.0177],
+            '頭份': [24.6958, 120.8967],
+            '豐原': [24.2567, 120.7235],
+            '員林': [23.9588, 120.5667],
+            '斗六': [23.7117, 120.5444],
+            '朴子': [23.4647, 120.2474],
+            '新營': [23.3059, 120.3175],
+            '鳳山': [22.6268, 120.3565],
+            '潮州': [22.5503, 120.5619]
+        };
+
+        // 主要地圖類別
+        class TaiwanRouteMap {
+            constructor() {
+                this.map = null;
+                this.routeLayers = [];
+                this.routeData = [];
+                this.autoRefreshTimer = null;
+                this.init();
+            }
+
+            // 初始化地圖
+            init() {
+                this.initMap();
+                this.bindEvents();
+                this.loadRoutes();
+                this.startAutoRefresh();
+                this.updateStatus('系統初始化完成');
+            }
+
+            // 建立地圖
+            initMap() {
+                this.map = L.map('map').setView(CONFIG.MAP_CENTER, CONFIG.MAP_ZOOM);
+                
+                // 添加地圖圖層
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors | 台灣路線追蹤系統',
+                    maxZoom: 18
+                }).addTo(this.map);
+
+                // 添加比例尺
+                L.control.scale({
+                    position: 'bottomleft',
+                    metric: true,
+                    imperial: false
+                }).addTo(this.map);
+
+                this.updateStatus('地圖初始化完成');
+            }
+
+            // 綁定事件
+            bindEvents() {
+                // 重新載入按鈕
+                document.getElementById('refreshBtn').addEventListener('click', () => {
+                    this.loadRoutes();
+                });
+
+                // 圖例切換按鈕
+                document.getElementById('toggleLegend').addEventListener('click', () => {
+                    const legend = document.getElementById('legend');
+                    legend.classList.toggle('hidden');
+                });
+
+                // 清除快取按鈕
+                document.getElementById('clearCache').addEventListener('click', () => {
+                    this.clearLocalCache();
+                });
+
+                // 地圖點擊事件
+                this.map.on('click', (e) => {
+                    console.log('點擊座標:', e.latlng);
+                });
+            }
+
+            // 載入路線資料
+            async loadRoutes() {
+                this.showLoading(true);
+                this.hideError();
+                this.updateStatus('正在載入路線資料...');
+
+                try {
+                    // 先嘗試從本地快取載入
+                    const cachedData = this.getLocalCache();
+                    if (cachedData && this.isCacheValid(cachedData.timestamp)) {
+                        console.log('使用本地快取資料');
+                        this.processRouteData(cachedData.routes, true);
+                        return;
+                    }
+
+                    // 從後端 API 載入
+                    const response = await fetch(`${CONFIG.API_BASE_URL}/api/routes`, {
+                        method: 'GET',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        timeout: 10000
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    
+                    const data = await response.json();
+                    
+                    if (data.success) {
+                        this.processRouteData(data.routes, data.cached);
+                        this.saveLocalCache(data.routes);
+                        this.updateStatus('資料載入成功');
+                    } else {
+                        throw new Error(data.message || '載入失敗');
+                    }
+                    
+                } catch (error) {
+                    console.error('載入路線失敗:', error);
+                    this.showError(error.message);
+                    this.updateStatus('載入失敗');
+                    
+                    // 嘗試使用舊的快取資料
+                    const oldCache = this.getLocalCache();
+                    if (oldCache) {
+                        console.log('使用舊快取資料');
+                        this.processRouteData(oldCache.routes, true);
+                        this.updateStatus('使用快取資料 (網路連線異常)');
+                    }
+                } finally {
+                    this.showLoading(false);
+                }
+            }
+
+            // 處理路線資料
+            processRouteData(routes, fromCache = false) {
+                this.routeData = routes;
+                this.clearRoutes();
+                this.drawRoutes(routes);
+                this.updateLegend(routes);
+                this.updateLastUpdate(fromCache);
+                this.updateRouteCount(routes.length);
+            }
+
+            // 清除現有路線
+            clearRoutes() {
+                this.routeLayers.forEach(layer => {
+                    this.map.removeLayer(layer);
+                });
+                this.routeLayers = [];
+            }
+
+            // 繪製路線
+            drawRoutes(routes) {
+                routes.forEach((route, index) => {
+                    const color = CONFIG.ROUTE_COLORS[index % CONFIG.ROUTE_COLORS.length];
+                    this.drawSingleRoute(route, color, index);
+                });
+
+                // 如果有路線，調整地圖視野
+                if (routes.length > 0) {
+                    this.fitMapToRoutes();
+                }
+            }
+
+            // 繪製單一路線
+            drawSingleRoute(route, color, index) {
+                const points = this.getRouteCoordinates(route);
+                
+                if (points.length < 2) {
+                    console.warn(`路線 ${index + 1} 座標不足:`, route);
+                    return;
+                }
+
+                // 繪製路線
+                const polyline = L.polyline(points, {
+                    color: color,
+                    weight: 5,
+                    opacity: 0.8,
+                    dashArray: route.status === 'planned' ? '10, 5' : null
+                }).addTo(this.map);
+
+                // 添加路線資訊彈出視窗
+                polyline.bindPopup(this.createRoutePopup(route), {
+                    maxWidth: 300,
+                    className: 'custom-popup'
+                });
+
+                // 添加滑鼠懸停效果
+                polyline.on('mouseover', function(e) {
+                    this.setStyle({
+                        weight: 7,
+                        opacity: 1.0
+                    });
+                });
+
+                polyline.on('mouseout', function(e) {
+                    this.setStyle({
+                        weight: 5,
+                        opacity: 0.8
+                    });
+                });
+
+                // 添加起點和終點標記
+                this.addRouteMarkers(points, route, color);
+                
+                this.routeLayers.push(polyline);
+            }
+
+            // 建立路線彈出視窗內容
+            createRoutePopup(route) {
+                const middlePoints = [route.middle1, route.middle2]
+                    .filter(point => point && point.trim() !== '')
+                    .map((point, index) => `<p><strong>📍 中點${index + 1}:</strong> ${point}</p>`)
+                    .join('');
+
+                return `
+                    <div class="route-popup">
+                        <h4>📅 ${route.date || '未指定日期'}</h4>
+                        <p><strong>🚩 起點:</strong> ${route.start}</p>
+                        ${middlePoints}
+                        <p><strong>🏁 終點:</strong> ${route.end}</p>
+                        <hr style="margin: 10px 0; border: 1px solid #eee;">
+                        <small style="color: #666;">
+                            距離: ${this.calculateRouteDistance(route)} 公里<br>
+                            預估時間: ${this.estimateRouteTime(route)} 小時
+                        </small>
+                    </div>
+                `;
+            }
+
+            // 獲取路線座標
+            getRouteCoordinates(route) {
+                const locations = [route.start, route.middle1, route.middle2, route.end]
+                    .filter(loc => loc && loc.trim() !== '');
+                
+                const coordinates = locations
+                    .map(location => {
+                        const trimmedLocation = location.trim();
+                        const coord = TAIWAN_LOCATIONS[trimmedLocation];
+                        if (!coord) {
+                            console.warn(`找不到座標: ${trimmedLocation}`);
+                        }
+                        return coord;
+                    })
+                    .filter(coord => coord !== undefined);
+
+                return coordinates;
+            }
+
+            // 添加路線標記
+            addRouteMarkers(points, route, color) {
+                if (points.length === 0) return;
+
+                // 起點標記
+                const startMarker = L.marker(points[0], {
+                    icon: this.createCustomIcon('🚩', color, 'start')
+                }).addTo(this.map);
+                
+                startMarker.bindPopup(`
+                    <div style="text-align: center;">
+                        <h4 style="color: ${color};">🚩 起點</h4>
+                        <p><strong>${route.start}</strong></p>
+                        <small>${route.date}</small>
+                    </div>
+                `);
+                this.routeLayers.push(startMarker);
+
+                // 中點標記
+                if (points.length > 2) {
+                    for (let i = 1; i < points.length - 1; i++) {
+                        const middleMarker = L.marker(points[i], {
+                            icon: this.createCustomIcon('📍', color, 'middle')
+                        }).addTo(this.map);
+                        
+                        const middleLocation = i === 1 ? route.middle1 : route.middle2;
+                        middleMarker.bindPopup(`
+                            <div style="text-align: center;">
+                                <h4 style="color: ${color};">📍 中點${i}</h4>
+                                <p><strong>${middleLocation}</strong></p>
+                                <small>${route.date}</small>
+                            </div>
+                        `);
+                        this.routeLayers.push(middleMarker);
+                    }
+                }
+
+                // 終點標記
+                if (points.length > 1) {
+                    const endMarker = L.marker(points[points.length - 1], {
+                        icon: this.createCustomIcon('🏁', color, 'end')
+                    }).addTo(this.map);
+                    
+                    endMarker.bindPopup(`
+                        <div style="text-align: center;">
+                            <h4 style="color: ${color};">🏁 終點</h4>
+                            <p><strong>${route.end}</strong></p>
+                            <small>${route.date}</small>
+                        </div>
+                    `);
+                    this.routeLayers.push(endMarker);
+                }
+            }
+
+            // 建立自定義圖標
+            createCustomIcon(emoji, color, type) {
+                const size = type === 'middle' ? 25 : 35;
+                const fontSize = type === 'middle' ? '12px' : '16px';
+                
+                return L.divIcon({
+                    html: `
+                        <div style="
+                            background: ${color}; 
+                            border-radius: 50%; 
+                            width: ${size}px; 
+                            height: ${size}px; 
+                            display: flex; 
+                            align-items: center; 
+                            justify-content: center; 
+                            border: 3px solid white; 
+                            box-shadow: 0 3px 6px rgba(0,0,0,0.3);
+                            font-size: ${fontSize};
+                            animation: bounce 2s infinite;
+                        ">${emoji}</div>
+                        <style>
+                            @keyframes bounce {
+                                0%, 20%, 50%, 80%, 100% { transform: translateY(0); }
+                                40% { transform: translateY(-10px); }
+                                60% { transform: translateY(-5px); }
+                            }
+                        </style>
+                    `,
+                    className: 'custom-marker',
+                    iconSize: [size, size],
+                    iconAnchor: [size/2, size/2]
+                });
+            }
+
+            // 調整地圖視野以顯示所有路線
+            fitMapToRoutes() {
+                const allPoints = [];
+                this.routeData.forEach(route => {
+                    const points = this.getRouteCoordinates(route);
+                    allPoints.push(...points);
+                });
+
+                if (allPoints.length > 0) {
+                    const group = new L.featureGroup(
+                        allPoints.map(point => L.marker(point))
+                    );
+                    this.map.fitBounds(group.getBounds().pad(0.1));
+                }
+            }
+
+            // 更新圖例
+            updateLegend(routes) {
+                const legendContent = document.getElementById('legendContent');
+                legendContent.innerHTML = '';
+
+                if (routes.length === 0) {
+                    legendContent.innerHTML = '<p style="color: #999; text-align: center;">暫無路線資料</p>';
+                    return;
+                }
+
+                routes.forEach((route, index) => {
+                    const color = CONFIG.ROUTE_COLORS[index % CONFIG.ROUTE_COLORS.length];
+                    const legendItem = document.createElement('div');
+                    legendItem.className = 'legend-item';
+                    
+                    const routeText = `${route.date || '未指定'}: ${route.start} → ${route.end}`;
+                    const distance = this.calculateRouteDistance(route);
+                    
+                    legendItem.innerHTML = `
+                        <div class="legend-color" style="background: ${color};"></div>
+                        <div class="legend-text">
+                            <div style="font-weight: bold;">${routeText}</div>
+                            <div style="color: #888; font-size: 11px;">距離: ${distance} km</div>
+                        </div>
+                    `;
+                    
+                    // 點擊圖例項目時聚焦到對應路線
+                    legendItem.addEventListener('click', () => {
+                        this.focusOnRoute(route);
+                    });
+                    
+                    legendContent.appendChild(legendItem);
+                });
+            }
+
+            // 聚焦到特定路線
+            focusOnRoute(route) {
+                const points = this.getRouteCoordinates(route);
+                if (points.length > 0) {
+                    const group = new L.featureGroup(
+                        points.map(point => L.marker(point))
+                    );
+                    this.map.fitBounds(group.getBounds().pad(0.2));
+                }
+            }
+
+            // 計算路線距離 (簡化版本)
+            calculateRouteDistance(route) {
+                const points = this.getRouteCoordinates(route);
+                if (points.length < 2) return 0;
+
+                let totalDistance = 0;
+                for (let i = 0; i < points.length - 1; i++) {
+                    totalDistance += this.calculateDistance(points[i], points[i + 1]);
+                }
+                return Math.round(totalDistance);
+            }
+
+            // 計算兩點間距離 (哈弗辛公式)
+            calculateDistance(point1, point2) {
+                const R = 6371; // 地球半徑 (公里)
+                const dLat = this.toRadians(point2[0] - point1[0]);
+                const dLon = this.toRadians(point2[1] - point1[1]);
+                const lat1 = this.toRadians(point1[0]);
+                const lat2 = this.toRadians(point2[0]);
+
+                const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                         Math.sin(dLon/2) * Math.sin(dLon/2) * Math.cos(lat1) * Math.cos(lat2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+                
+                return R * c;
+            }
+            // 角度轉弧度
+            toRadians(degrees) {
+                return degrees * (Math.PI / 180);
+            }
+
+            // 估算路線時間
+            estimateRouteTime(route) {
+                const distance = this.calculateRouteDistance(route);
+                const avgSpeed = 60; // 平均速度 60 km/h
+                return Math.round((distance / avgSpeed) * 10) / 10;
+            }
+
+            // 本地快取管理
+            saveLocalCache(routes) {
+                try {
+                    const cacheData = {
+                        routes: routes,
+                        timestamp: Date.now()
+                    };
+                    localStorage.setItem('taiwanRouteCache', JSON.stringify(cacheData));
+                } catch (error) {
+                    console.warn('無法儲存快取:', error);
+                }
+            }
+
+            getLocalCache() {
+                try {
+                    const cached = localStorage.getItem('taiwanRouteCache');
+                    return cached ? JSON.parse(cached) : null;
+                } catch (error) {
+                    console.warn('無法讀取快取:', error);
+                    return null;
+                }
+            }
+
+            clearLocalCache() {
+                try {
+                    localStorage.removeItem('taiwanRouteCache');
+                    this.updateStatus('快取已清除');
+                    alert('✅ 本地快取已清除！下次載入將獲取最新資料。');
+                } catch (error) {
+                    console.warn('無法清除快取:', error);
+                }
+            }
+
+            isCacheValid(timestamp) {
+                const cacheAge = Date.now() - timestamp;
+                const maxAge = 10 * 60 * 1000; // 10分鐘
+                return cacheAge < maxAge;
+            }
+
+            // UI 更新方法
+            showLoading(show) {
+                const loading = document.getElementById('loading');
+                if (show) {
+                    loading.classList.remove('hidden');
+                } else {
+                    loading.classList.add('hidden');
+                }
+            }
+
+            showError(message = '載入失敗，請稍後再試') {
+                const errorDiv = document.getElementById('error');
+                const errorMessage = document.getElementById('errorMessage');
+                errorMessage.textContent = message;
+                errorDiv.classList.remove('hidden');
+            }
+
+            hideError() {
+                document.getElementById('error').classList.add('hidden');
+            }
+
+            updateStatus(status) {
+                document.getElementById('statusText').textContent = status;
+            }
+
+            updateLastUpdate(fromCache = false) {
+                const now = new Date();
+                const timeString = now.toLocaleString('zh-TW', {
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    second: '2-digit'
+                });
+                
+                const cacheIndicator = fromCache ? ' (快取)' : '';
+                document.getElementById('lastUpdate').textContent = timeString + cacheIndicator;
+            }
+
+            updateRouteCount(count) {
+                document.getElementById('routeCount').textContent = count;
+            }
+
+            // 自動更新
+            startAutoRefresh() {
+                // 清除現有計時器
+                if (this.autoRefreshTimer) {
+                    clearInterval(this.autoRefreshTimer);
+                }
+
+                // 設定新的自動更新計時器
+                this.autoRefreshTimer = setInterval(() => {
+                    console.log('自動更新路線資料...');
+                    this.loadRoutes();
+                }, CONFIG.REFRESH_INTERVAL);
+
+                console.log(`已啟動自動更新，間隔: ${CONFIG.REFRESH_INTERVAL / 1000} 秒`);
+            }
+
+            stopAutoRefresh() {
+                if (this.autoRefreshTimer) {
+                    clearInterval(this.autoRefreshTimer);
+                    this.autoRefreshTimer = null;
+                    console.log('已停止自動更新');
+                }
+            }
+
+            // 匯出資料功能
+            exportRouteData() {
+                try {
+                    const dataStr = JSON.stringify(this.routeData, null, 2);
+                    const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                    
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(dataBlob);
+                    link.download = `taiwan_routes_${new Date().toISOString().split('T')[0]}.json`;
+                    link.click();
+                    
+                    this.updateStatus('資料匯出成功');
+                } catch (error) {
+                    console.error('匯出失敗:', error);
+                    alert('❌ 匯出失敗，請稍後再試');
+                }
+            }
+
+            // 搜尋功能
+            searchRoutes(keyword) {
+                const filteredRoutes = this.routeData.filter(route => {
+                    return route.start.includes(keyword) || 
+                           route.end.includes(keyword) ||
+                           (route.middle1 && route.middle1.includes(keyword)) ||
+                           (route.middle2 && route.middle2.includes(keyword)) ||
+                           (route.date && route.date.includes(keyword));
+                });
+
+                this.clearRoutes();
+                this.drawRoutes(filteredRoutes);
+                this.updateLegend(filteredRoutes);
+                this.updateRouteCount(filteredRoutes.length);
+                
+                if (filteredRoutes.length === 0) {
+                    alert(`🔍 找不到包含 "${keyword}" 的路線`);
+                } else {
+                    this.updateStatus(`搜尋結果: ${filteredRoutes.length} 條路線`);
+                }
+            }
+
+            // 重置顯示
+            resetDisplay() {
+                this.clearRoutes();
+                this.drawRoutes(this.routeData);
+                this.updateLegend(this.routeData);
+                this.updateRouteCount(this.routeData.length);
+                this.updateStatus('已重置顯示');
+            }
+
+            // 獲取統計資訊
+            getStatistics() {
+                const stats = {
+                    totalRoutes: this.routeData.length,
+                    totalDistance: 0,
+                    totalTime: 0,
+                    cities: new Set(),
+                    dateRange: {
+                        earliest: null,
+                        latest: null
+                    }
+                };
+
+                this.routeData.forEach(route => {
+                    // 計算總距離和時間
+                    const distance = this.calculateRouteDistance(route);
+                    const time = this.estimateRouteTime(route);
+                    stats.totalDistance += distance;
+                    stats.totalTime += time;
+
+                    // 收集城市
+                    [route.start, route.middle1, route.middle2, route.end]
+                        .filter(city => city && city.trim() !== '')
+                        .forEach(city => stats.cities.add(city.trim()));
+
+                    // 日期範圍
+                    if (route.date) {
+                        const date = new Date(route.date);
+                        if (!stats.dateRange.earliest || date < stats.dateRange.earliest) {
+                            stats.dateRange.earliest = date;
+                        }
+                        if (!stats.dateRange.latest || date > stats.dateRange.latest) {
+                            stats.dateRange.latest = date;
+                        }
+                    }
+                });
+
+                stats.cities = Array.from(stats.cities);
+                stats.totalDistance = Math.round(stats.totalDistance);
+                stats.totalTime = Math.round(stats.totalTime * 10) / 10;
+
+                return stats;
+            }
+
+            // 顯示統計資訊
+            showStatistics() {
+                const stats = this.getStatistics();
+                const earliestDate = stats.dateRange.earliest ? 
+                    stats.dateRange.earliest.toLocaleDateString('zh-TW') : '無';
+                const latestDate = stats.dateRange.latest ? 
+                    stats.dateRange.latest.toLocaleDateString('zh-TW') : '無';
+
+                const statsHtml = `
+                    <div style="font-family: Microsoft JhengHei; line-height: 1.6;">
+                        <h3 style="color: #4CAF50; margin-bottom: 15px;">📊 路線統計資訊</h3>
+                        <p><strong>📈 總路線數:</strong> ${stats.totalRoutes} 條</p>
+                        <p><strong>📏 總距離:</strong> ${stats.totalDistance} 公里</p>
+                        <p><strong>⏱️ 總時間:</strong> ${stats.totalTime} 小時</p>
+                        <p><strong>🏙️ 涉及城市:</strong> ${stats.cities.length} 個</p>
+                        <p><strong>📅 日期範圍:</strong> ${earliestDate} ~ ${latestDate}</p>
+                        <hr style="margin: 15px 0;">
+                        <p><strong>🌟 平均每條路線:</strong></p>
+                        <p style="margin-left: 20px;">
+                            距離: ${Math.round(stats.totalDistance / stats.totalRoutes)} 公里<br>
+                            時間: ${Math.round((stats.totalTime / stats.totalRoutes) * 10) / 10} 小時
+                        </p>
+                        <p><strong>🗺️ 主要城市:</strong></p>
+                        <p style="margin-left: 20px; font-size: 0.9em;">
+                            ${stats.cities.slice(0, 10).join(', ')}
+                            ${stats.cities.length > 10 ? '...' : ''}
+                        </p>
+                    </div>
+                `;
+
+                // 建立統計彈出視窗
+                const popup = L.popup({
+                    maxWidth: 400,
+                    className: 'stats-popup'
+                })
+                .setLatLng(CONFIG.MAP_CENTER)
+                .setContent(statsHtml)
+                .openOn(this.map);
+            }
+
+            // 銷毀方法
+            destroy() {
+                this.stopAutoRefresh();
+                this.clearRoutes();
+                if (this.map) {
+                    this.map.remove();
+                }
+            }
+        }
+
+        // 全域變數
+        let taiwanMap;
+
+        // 頁面載入完成後初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('🚀 台灣路線地圖系統啟動中...');
+            
+            try {
+                taiwanMap = new TaiwanRouteMap();
+                window.taiwanMap = taiwanMap; // 供外部訪問
+                
+                // 添加鍵盤快捷鍵
+                document.addEventListener('keydown', (e) => {
+                    if (e.ctrlKey || e.metaKey) {
+                        switch(e.key) {
+                            case 'r':
+                                e.preventDefault();
+                                taiwanMap.loadRoutes();
+                                break;
+                            case 'l':
+                                e.preventDefault();
+                                document.getElementById('toggleLegend').click();
+                                break;
+                            case 's':
+                                e.preventDefault();
+                                taiwanMap.showStatistics();
+                                break;
+                            case 'e':
+                                e.preventDefault();
+                                taiwanMap.exportRouteData();
+                                break;
+                        }
+                    }
+                });
+
+                // 添加搜尋功能
+                const searchInput = document.createElement('input');
+                searchInput.type = 'text';
+                searchInput.placeholder = '🔍 搜尋路線... (Ctrl+F)';
+                searchInput.style.cssText = `
+                    position: absolute;
+                    top: 20px;
+                    left: 20px;
+                    z-index: 1000;
+                    padding: 10px 15px;
+                    border: none;
+                    border-radius: 25px;
+                    background: rgba(255, 255, 255, 0.9);
+                    backdrop-filter: blur(10px);
+                    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+                    font-size: 14px;
+                    width: 200px;
+                    transition: all 0.3s ease;
+                `;
+
+                searchInput.addEventListener('focus', () => {
+                    searchInput.style.width = '250px';
+                    searchInput.style.background = 'rgba(255, 255, 255, 0.95)';
+                });
+
+                searchInput.addEventListener('blur', () => {
+                    searchInput.style.width = '200px';
+                    searchInput.style.background = 'rgba(255, 255, 255, 0.9)';
+                });
+
+                searchInput.addEventListener('input', (e) => {
+                    const keyword = e.target.value.trim();
+                    if (keyword === '') {
+                        taiwanMap.resetDisplay();
+                    } else if (keyword.length >= 2) {
+                        taiwanMap.searchRoutes(keyword);
+                    }
+                });
+
+                // 添加 Ctrl+F 快捷鍵聚焦搜尋框
+                document.addEventListener('keydown', (e) => {
+                    if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                        e.preventDefault();
+                        searchInput.focus();
+                    }
+                });
+
+                document.querySelector('.map-container').appendChild(searchInput);
+
+                // 添加統計按鈕
+                const statsBtn = document.createElement('button');
+                statsBtn.innerHTML = '📊 統計';
+                statsBtn.onclick = () => taiwanMap.showStatistics();
+                document.querySelector('.controls').appendChild(statsBtn);
+
+                // 添加匯出按鈕
+                const exportBtn = document.createElement('button');
+                exportBtn.innerHTML = '💾 匯出';
+                exportBtn.onclick = () => taiwanMap.exportRouteData();
+                document.querySelector('.controls').appendChild(exportBtn);
+
+                console.log('✅ 系統初始化完成！');
+                console.log('🔧 快捷鍵說明:');
+                console.log('   Ctrl+R: 重新載入');
+                console.log('   Ctrl+L: 切換圖例');
+                console.log('   Ctrl+S: 顯示統計');
+                console.log('   Ctrl+E: 匯出資料');
+                console.log('   Ctrl+F: 搜尋路線');
+
+            } catch (error) {
+                console.error('❌ 系統初始化失敗:', error);
+                alert('系統初始化失敗，請重新整理頁面');
+            }
+        });
+
+        // 頁面卸載時清理資源
+        window.addEventListener('beforeunload', () => {
+            if (taiwanMap) {
+                taiwanMap.destroy();
+            }
+        });
+
+        // 處理網路狀態變化
+        window.addEventListener('online', () => {
+            console.log('🌐 網路連線恢復');
+            if (taiwanMap) {
+                taiwanMap.updateStatus('網路連線恢復');
+                taiwanMap.loadRoutes();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('📡 網路連線中斷');
+            if (taiwanMap) {
+                taiwanMap.updateStatus('網路連線中斷 (使用快取資料)');
+            }
+        });
+
+        // 視窗大小變化時調整地圖
+        window.addEventListener('resize', () => {
+            if (taiwanMap && taiwanMap.map) {
+                setTimeout(() => {
+                    taiwanMap.map.invalidateSize();
+                }, 100);
+            }
+        });
+
+        // 錯誤處理
+        window.addEventListener('error', (e) => {
+            console.error('全域錯誤:', e.error);
+            if (taiwanMap) {
+                taiwanMap.updateStatus('系統發生錯誤');
+            }
+        });
+
+        // 未處理的 Promise 拒絕
+        window.addEventListener('unhandledrejection', (e) => {
+            console.error('未處理的 Promise 錯誤:', e.reason);
+            e.preventDefault();
+        });
+
+        // 開發者工具
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+            console.log('🔧 開發模式已啟用');
+            window.debugTaiwanMap = {
+                getRouteData: () => taiwanMap?.routeData,
+                getStatistics: () => taiwanMap?.getStatistics(),
+                clearCache: () => taiwanMap?.clearLocalCache(),
+                exportData: () => taiwanMap?.exportRouteData(),
+                loadRoutes: () => taiwanMap?.loadRoutes()
+            };
+        }
+    </script>
+</body>
+</html>
